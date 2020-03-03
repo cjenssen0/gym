@@ -26,11 +26,13 @@ class RewardFunction:
 
         elif reward_flag == 'gamma':
             ''' gamma reward function within "safe" interval, negative polynomials outside boundary'''
-
-            mode = 108
-            low_bg = 72
-            high_bg = 200
-            x = blood_glucose_level
+            # set normalizing factor for states
+            tau_l = 10.
+            tau_bg = 250./tau_l
+            mode = 108 / tau_bg
+            low_bg = 72 / tau_bg
+            high_bg = 200 / tau_bg
+            x = blood_glucose_level / tau_bg
             reward = np.empty_like(blood_glucose_level)
 
             # Defining the parts of the reward function
@@ -112,10 +114,10 @@ class RewardFunction:
             h = 42.
             loc = 91.
             a = 3.5
-            reward = (1/0.016) * stats.skewnorm.pdf(blood_glucose_level, a, loc=loc, scale=h)
-            reward[blood_glucose_level<72] = -1.1
-            reward[blood_glucose_level>210] = -1.
-
+            reward = (1/0.016) * \
+                stats.skewnorm.pdf(blood_glucose_level, a, loc=loc, scale=h)
+            reward[blood_glucose_level < 72] = -1.1
+            reward[blood_glucose_level > 210] = -1.
 
         elif reward_flag == 'gaussian_with_insulin':
             ''' Gaussian reward function '''
