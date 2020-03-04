@@ -111,13 +111,16 @@ class RewardFunction:
 
         elif reward_flag == 'skewed_gaussian':
             ''' Skewed Gaussian reward function'''
-            h = 42.
-            loc = 91.
+            # set normalizing factor for states
+            tau_l = 10.
+            tau_bg = 250./tau_l
+            h = 42. / tau_bg
+            loc = 91. / tau_bg
             a = 3.5
             reward = (1/0.016) * \
                 stats.skewnorm.pdf(blood_glucose_level, a, loc=loc, scale=h)
-            reward[blood_glucose_level < 72] = -1.1
-            reward[blood_glucose_level > 210] = -1.
+            reward[blood_glucose_level/tau_bg < 72 / tau_bg] = -1.1
+            reward[blood_glucose_level/tau_bg > 210/tau_bg] = -1.
 
         elif reward_flag == 'gaussian_with_insulin':
             ''' Gaussian reward function '''
