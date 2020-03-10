@@ -125,9 +125,13 @@ class HovorkaCambridgeBase(gym.Env):
         self.n_solver_steps = 1
         self.stepsize = int(self.simulation_time/self.n_solver_steps)
 
+        # Set time variable for use in the state
+        self.t = 0.
+        self.dt = self.simulation_time / 60
+
         # Observation space -- the state space for the RL algorithm -> 30 mins of glucose values and 4 insulin values (last 2 hours)
         self.observation_space = spaces.Box(
-            0, 500, (int(self.stepsize + 4),), dtype=np.float32)
+            0, 500, (int(self.stepsize + 5),), dtype=np.float32)
 
         # State is BG, simulation_state is parameters of hovorka model
 
@@ -135,7 +139,7 @@ class HovorkaCambridgeBase(gym.Env):
         initial_insulin = np.ones(4) * self.init_basal_optimal
         initial_bg = X0[-1] * 18 / self.tau_bg
         self.state = np.concatenate(
-            [np.repeat(initial_bg, self.stepsize), initial_insulin])
+            [np.repeat(initial_bg, self.stepsize), initial_insulin, [self.t]])
 
         self.simulation_state = X0
 
@@ -241,9 +245,10 @@ class HovorkaCambridgeBase(gym.Env):
         self.insulin_history = np.concatenate(
             [self.insulin_history, insulin_rate])
 
-        # Updating state (bg and insulin)
+        # Updating state (bg, insulin and time)
+        self.t += self.dt
         self.state = np.concatenate(
-            [np.array(bg)/self.tau_bg, list(reversed(self.insulin_history[-4:]))])
+            [np.array(bg)/self.tau_bg, list(reversed(self.insulin_history[-4:])), [self.t]])
 
         # Set environment done = True if blood_glucose_level is negative or max iters is overflowed
         done = 0
@@ -294,6 +299,9 @@ class HovorkaCambridgeBase(gym.Env):
         This is basically a copy of the init function
         '''
 
+        # Reset time counter
+        self.t = 0.
+
         # re init -- in case the init basal has been changed
         if self.reset_basal_manually is None:
             self.init_basal = np.random.choice(np.linspace(
@@ -312,7 +320,7 @@ class HovorkaCambridgeBase(gym.Env):
         initial_bg = X0[-1] * 18
         initial_insulin = np.ones(4) * self.init_basal_optimal
         self.state = np.concatenate(
-            [np.repeat(initial_bg, self.stepsize)/self.tau_bg, initial_insulin])
+            [np.repeat(initial_bg, self.stepsize)/self.tau_bg, initial_insulin, [self.t]])
 
         self.simulation_state = X0
         self.bg_history = []
