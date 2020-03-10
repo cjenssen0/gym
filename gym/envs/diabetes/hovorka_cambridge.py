@@ -297,7 +297,7 @@ class HovorkaCambridgeBase(gym.Env):
         # re init -- in case the init basal has been changed
         if self.reset_basal_manually is None:
             self.init_basal = np.random.choice(np.linspace(
-                self.init_basal_optimal-2, self.init_basal_optimal, 10))
+                self.init_basal_optimal-1, self.init_basal_optimal+0.5, 10))
         else:
             self.init_basal = self.reset_basal_manually
 
