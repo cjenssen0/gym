@@ -4,10 +4,10 @@ from scipy import stats
 
 class RewardFunction:
 
-    # def __init__(self):
+    def __init__(self):
 
         # self.tir = 0
-        # self.reward = []
+        self.reward = np.zeros(30)
 
     def calculate_reward(self, blood_glucose_level, reward_flag='absolute', bg_ref=108, action=None, blood_glucose_level_start=None):
         """
@@ -59,6 +59,52 @@ class RewardFunction:
             reward[(low_bg <= x)*(x <= high_bg)] = gammaDist(
                 x[(low_bg <= x)*(x <= high_bg)], mode, low_bg)
             return reward
+
+        elif reward_flag == 'gammaGauss':
+            # Normalizing factors
+            tau_l = 10.
+            tau_bg = 250/tau_l
+
+            # Setting parameters
+            a = 4.0
+            low_bg = 72 / tau_bg
+            high_bg = 200 / tau_bg
+            mode = 108/tau_bg
+            x = blood_glucose_level / tau_bg
+
+            alpha = 0.6
+            sigma = 0.5*np.sqrt(abs(mode - low_bg))
+
+            def gammaRev(x, a, mode, loc):
+                # dist = stats.skewnorm(a, loc, scale)
+                theta = (mode-loc)/(a-1)
+                dist = stats.gamma(a, loc=loc, scale=theta)
+                distMax = dist.pdf(mode)
+                R = dist.pdf(x) / distMax
+                return R
+
+            def Gauss(x, mode, scale):
+                dist = stats.norm(mode, scale)
+                distMax = dist.pdf(mode)
+                R = dist.pdf(x)/distMax - 1
+                return R/10
+
+            def rewGauss(self, x, a, mode, low_bg, high_bg, sigma):
+                R = 0.
+                x_I = x[(low_bg < x)*(x < high_bg)]
+                R += sum(Gauss(x[x <= low_bg], low_bg, alpha*sigma))
+                R += sum(Gauss(x[x >= high_bg], high_bg, sigma))
+                R += sum(gammaRev(x_I, a, mode, low_bg))
+                R = R/len(x)
+                self.reward[x <= low_bg] = Gauss(
+                    x[x <= low_bg], low_bg, alpha*sigma)
+                self.reward[x >= high_bg] = Gauss(
+                    x[x >= high_bg], high_bg, sigma)
+                self.reward[(low_bg < x)*(x < high_bg)
+                            ] = gammaRev(x_I, a, mode, low_bg)
+                return R
+            rewGauss(self, x, a, mode, low_bg, high_bg, sigma)
+            return self.reward
 
         elif reward_flag == 'binary_tight':
             ''' Tighter version of the binary reward function,
