@@ -9,7 +9,7 @@ class RewardFunction:
         # self.tir = 0
         self.reward = np.zeros(30)
 
-    def calculate_reward(self, blood_glucose_level, reward_flag='absolute', bg_ref=108, action=None, blood_glucose_level_start=None):
+    def calculate_reward(self, blood_glucose_level, reward_flag='absolute', bg_ref=108, action=None, blood_glucose_level_start=None, tau_bg=1.):
         """
         Calculating rewards for the given blood glucose level
         """
@@ -26,9 +26,6 @@ class RewardFunction:
 
         elif reward_flag == 'gamma':
             ''' gamma reward function within "safe" interval, negative polynomials outside boundary'''
-            # set normalizing factor for states
-            tau_l = 10.
-            tau_bg = 250./tau_l
             mode = 108 / tau_bg
             low_bg = 72 / tau_bg
             high_bg = 200 / tau_bg
@@ -61,9 +58,6 @@ class RewardFunction:
             return reward
 
         elif reward_flag == 'gammaGauss':
-            # Normalizing factors
-            tau_l = 10.
-            tau_bg = 250/tau_l
 
             # Setting parameters
             a = 4.0
@@ -80,31 +74,39 @@ class RewardFunction:
                 theta = (mode-loc)/(a-1)
                 dist = stats.gamma(a, loc=loc, scale=theta)
                 distMax = dist.pdf(mode)
-                R = dist.pdf(x) / distMax
+                R = (dist.pdf(x) / distMax)
                 return R
 
             def Gauss(x, mode, scale):
                 dist = stats.norm(mode, scale)
                 distMax = dist.pdf(mode)
                 R = dist.pdf(x)/distMax - 1
-                return R/10
+                return R
 
             def rewGauss(self, x, a, mode, low_bg, high_bg, sigma):
                 R = 0.
                 x_I = x[(low_bg < x)*(x < high_bg)]
-                R += sum(Gauss(x[x <= low_bg], low_bg, alpha*sigma))
-                R += sum(Gauss(x[x >= high_bg], high_bg, sigma))
+                x_low = x[x <= low_bg]
+                x_high = x[x >= high_bg]
+
+                if len(x_low) > 0:
+                    R += sum(Gauss(x_low, low_bg, alpha*sigma))
+                else:
+                    R += 0.0
+                if len(x_low) > 0:
+                    R += sum(Gauss(x_high, high_bg, sigma))
+                else:
+                    R += 0.0
                 R += sum(gammaRev(x_I, a, mode, low_bg))
-                R = R/len(x)
-                self.reward[x <= low_bg] = Gauss(
-                    x[x <= low_bg], low_bg, alpha*sigma)
-                self.reward[x >= high_bg] = Gauss(
-                    x[x >= high_bg], high_bg, sigma)
-                self.reward[(low_bg < x)*(x < high_bg)
-                            ] = gammaRev(x_I, a, mode, low_bg)
+                # self.reward[x <= low_bg] = Gauss(
+                #     x[x <= low_bg], low_bg, alpha*sigma)
+                # self.reward[x >= high_bg] = Gauss(
+                #     x[x >= high_bg], high_bg, sigma)
+                # self.reward[(low_bg < x)*(x < high_bg)
+                #             ] = gammaRev(x_I, a, mode, low_bg)
                 return R
-            rewGauss(self, x, a, mode, low_bg, high_bg, sigma)
-            return self.reward
+            R = rewGauss(self, x, a, mode, low_bg, high_bg, sigma)
+            return R
 
         elif reward_flag == 'binary_tight':
             ''' Tighter version of the binary reward function,
@@ -158,15 +160,14 @@ class RewardFunction:
         elif reward_flag == 'skewed_gaussian':
             ''' Skewed Gaussian reward function'''
             # set normalizing factor for states
-            tau_l = 10.
-            tau_bg = 250./tau_l
+            x = blood_glucose_level / tau_bg
             h = 42. / tau_bg
             loc = 91. / tau_bg
             a = 3.5
             reward = (1/0.016) * \
-                stats.skewnorm.pdf(blood_glucose_level, a, loc=loc, scale=h)
-            reward[blood_glucose_level/tau_bg < 72 / tau_bg] = -1.1
-            reward[blood_glucose_level/tau_bg > 210/tau_bg] = -1.
+                stats.skewnorm.pdf(x, a, loc=loc, scale=h)
+            reward[x < 72 / tau_bg] = -2.5
+            reward[x > 200/tau_bg] = -2.
 
         elif reward_flag == 'gaussian_with_insulin':
             ''' Gaussian reward function '''

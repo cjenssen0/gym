@@ -268,7 +268,7 @@ class HovorkaCambridgeBase(gym.Env):
         if not done:
             if self.reward_flag != 'gaussian_with_insulin':
                 reward = rewardFunction.calculate_reward(
-                    np.array(bg), self.reward_flag, 108)
+                    np.array(bg), self.reward_flag, 108, tau_bg=self.tau_bg)
             else:
                 reward = rewardFunction.calculate_reward(
                     np.array(bg), 'gaussian_with_insulin', 108, action)
@@ -280,7 +280,7 @@ class HovorkaCambridgeBase(gym.Env):
             # reward = -1000
             if self.reward_flag != 'gaussian_with_insulin':
                 reward = rewardFunction.calculate_reward(
-                    np.array(bg), self.reward_flag, 108)
+                    np.array(bg), self.reward_flag, 108, tau_bg=self.tau_bg)
             else:
                 reward = rewardFunction.calculate_reward(
                     np.array(bg), 'gaussian_with_insulin', 108, action)
