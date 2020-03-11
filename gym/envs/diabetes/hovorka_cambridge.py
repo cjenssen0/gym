@@ -88,7 +88,7 @@ class HovorkaCambridgeBase(gym.Env):
 
         # This is the space of allowable actions -- from 0 insulin (stop the pump) to twice the basal rate
         self.action_space = spaces.Box(
-            0, 2*self.init_basal_optimal, (1,), dtype=np.float32)
+            0, 4*self.init_basal_optimal, (1,), dtype=np.float32)
 
         # Initialize episode randomly or at a fixed BG level
         if bg_init_flag == 'random':
