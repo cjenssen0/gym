@@ -57,6 +57,14 @@ class HovorkaCambridgeBase(gym.Env):
         'video.frames_per_second': 50
     }
 
+    def scaleNorm(self, x, x_max, reverse=False):
+        xm = 0.5*x_max
+        if reverse:
+            y = xm*x + xm
+        else:
+            y = (x - xm)/xm
+        return y
+
     def __init__(self):
         """
         Initializing the simulation environment.
@@ -66,17 +74,25 @@ class HovorkaCambridgeBase(gym.Env):
         self.previous_action = 0
 
         # "normalize" range for bg in state-space -> bg in [0, tau_l]
-        tau_l = 10.
-        self.tau_bg = 250./tau_l
+        # isNormalizeFeat = True
+        # tau_l = 10.
+        # self.tau_bg = 250./tau_l
+        # function for scaling features to range [-1,1]
+
+        def normalize(isNormalizeFeat=True):
+            self.tau_bg = 500.
+            self.tau_action = self.action_space.high[0]
+            self.tau_t = 72
 
         # Bolus carb factor -- [g/U]
         self.bolus = 30
 
+        self.tau_bg = 1.
+        self.tau_action = 1.
+        self.tau_t = 1.
+
         # Updating variable parameters -- reward and initial basal rate
         reward_flag, bg_init_flag = self._update_parameters()
-
-        # Action space
-        self.sensor_noise = np.random.randn(1)
 
         # Model parameters
         P = hovorka_parameters(70)
@@ -90,6 +106,9 @@ class HovorkaCambridgeBase(gym.Env):
         self.action_space = spaces.Box(
             0, 4*self.init_basal_optimal, (1,), dtype=np.float32)
 
+        normalize()
+        # Action space
+        self.sensor_noise = np.random.randn(1) / self.tau_bg
         # Initialize episode randomly or at a fixed BG level
         if bg_init_flag == 'random':
             self.init_basal = np.random.choice(np.linspace(
@@ -125,9 +144,11 @@ class HovorkaCambridgeBase(gym.Env):
         self.n_solver_steps = 1
         self.stepsize = int(self.simulation_time/self.n_solver_steps)
 
-        # Set time variable for use in the state
+        # Set time variable for use in the state, initialize bg
         self.t = 0.
         self.dt = self.simulation_time / 60
+        t_norm = self.scaleNorm(self.t, self.tau_t)
+        self.bg = np.empty(30, dtype=np.float32)
 
         # Observation space -- the state space for the RL algorithm -> 30 mins of glucose values and 4 insulin values (last 2 hours)
         self.observation_space = spaces.Box(
@@ -137,9 +158,11 @@ class HovorkaCambridgeBase(gym.Env):
 
         # The initial value of insulin is just 4 copies of the basal rate
         initial_insulin = np.ones(4) * self.init_basal_optimal
-        initial_bg = X0[-1] * 18 / self.tau_bg
+        initial_bg = X0[-1] * 18
+        initial_insulin_norm = self.scaleNorm(initial_insulin, self.tau_action)
+        initial_bg_norm = self.scaleNorm(initial_bg, self.tau_bg)
         self.state = np.concatenate(
-            [np.repeat(initial_bg, self.stepsize), initial_insulin, [self.t]])
+            [np.repeat(initial_bg_norm, self.stepsize), initial_insulin_norm, [t_norm]])
 
         self.simulation_state = X0
 
@@ -198,7 +221,7 @@ class HovorkaCambridgeBase(gym.Env):
         to the insulin to carb ratio (bolus).
         """
 
-        # Manually checking and forcing the action to be within bounds insted of using assert.
+        # Manually checking and forcing the action to be within bounds instead of using assert.
         # We should be careful with this
         if action > self.action_space.high:
             action = self.action_space.high
@@ -209,8 +232,6 @@ class HovorkaCambridgeBase(gym.Env):
 
         self.integrator.set_initial_value(
             self.simulation_state, self.num_iters)
-
-        bg = []
 
         # ==========================
         # Integration loop
@@ -233,7 +254,7 @@ class HovorkaCambridgeBase(gym.Env):
             # solving the equations for 1 minute at a time
             self.integrator.integrate(self.integrator.t + 1)
 
-            bg.append(self.integrator.y[-1] * 18)
+            self.bg[i] = (self.integrator.y[-1] * 18)
 
             self.num_iters += 1
 
@@ -241,25 +262,27 @@ class HovorkaCambridgeBase(gym.Env):
         self.simulation_state = self.integrator.y
 
         # Recording bg history for plotting
-        self.bg_history = np.concatenate([self.bg_history, bg])
+        self.bg_history = np.concatenate([self.bg_history, self.bg])
         self.insulin_history = np.concatenate(
             [self.insulin_history, insulin_rate])
 
         # Updating state (bg, insulin and time)
         self.t += self.dt
+        t_norm = self.scaleNorm(self.t, self.tau_t)
+        bg_norm = self.scaleNorm(self.bg, self.tau_bg)
+        insulin_norm = self.scaleNorm(
+            self.insulin_history[-4:], self.tau_action)
         self.state = np.concatenate(
-            [np.array(bg)/self.tau_bg, list(reversed(self.insulin_history[-4:])), [self.t]])
+            [bg_norm, insulin_norm, [t_norm]])
 
         # Set environment done = True if blood_glucose_level is negative or max iters is overflowed
-        done = 0
+        done = False
 
-        if (np.max(bg) > self.bg_threshold_high or np.max(bg) < self.bg_threshold_low):
-            done = 1
+        if (np.max(self.bg) > self.bg_threshold_high or np.max(self.bg) < self.bg_threshold_low):
+            done = True
 
         if self.num_iters > self.max_iter:
-            done = 1
-
-        done = bool(done)
+            done = True
 
         # ====================================================================================
         # Calculate Reward  (and give error if action is taken after terminal state)
@@ -268,10 +291,10 @@ class HovorkaCambridgeBase(gym.Env):
         if not done:
             if self.reward_flag != 'gaussian_with_insulin':
                 reward = rewardFunction.calculate_reward(
-                    np.array(bg), self.reward_flag, 108, tau_bg=self.tau_bg)
+                    self.bg, self.reward_flag, 108, tau_bg=self.tau_bg)
             else:
                 reward = rewardFunction.calculate_reward(
-                    np.array(bg), 'gaussian_with_insulin', 108, action)
+                    bg_norm, 'gaussian_with_insulin', 108, action)
 
         elif self.steps_beyond_done is None:
             # Blood glucose below zero -- simulation out of bounds
@@ -280,10 +303,10 @@ class HovorkaCambridgeBase(gym.Env):
             # reward = -1000
             if self.reward_flag != 'gaussian_with_insulin':
                 reward = rewardFunction.calculate_reward(
-                    np.array(bg), self.reward_flag, 108, tau_bg=self.tau_bg)
+                    bg_norm, self.reward_flag, 108, tau_bg=self.tau_bg)
             else:
                 reward = rewardFunction.calculate_reward(
-                    np.array(bg), 'gaussian_with_insulin', 108, action)
+                    bg_norm, 'gaussian_with_insulin', 108, action)
         else:
             if self.steps_beyond_done == 0:
                 logger.warning("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
