@@ -13,18 +13,8 @@ class RewardFunction:
         """
         Calculating rewards for the given blood glucose level
         """
-
-        if reward_flag == 'binary':
-            ''' Binary reward function'''
-            low_bg = 70
-            high_bg = 120
-
-            if np.max(blood_glucose_level) < high_bg and np.min(blood_glucose_level) > low_bg:
-                reward = 1
-            else:
-                reward = 0
-
-        elif reward_flag == 'gamma':
+        tau_bg = 250.
+        if reward_flag == 'gamma':
             ''' gamma reward function within "safe" interval, negative polynomials outside boundary'''
             mode = 108 / tau_bg
             low_bg = 72 / tau_bg
@@ -108,32 +98,6 @@ class RewardFunction:
             R = rewGauss(self, x, a, mode, low_bg, high_bg, sigma)
             return R
 
-        elif reward_flag == 'binary_tight':
-            ''' Tighter version of the binary reward function,
-            the bounds are[-5, 5] around the optimal rate.
-            '''
-            # low_bg = bg_ref - 5
-            # high_bg = bg_ref + 5
-
-            low_bg = bg_ref - 10
-            high_bg = bg_ref + 10
-
-            if np.max(blood_glucose_level) < high_bg and np.min(blood_glucose_level) > low_bg:
-                # reward = 200
-                reward = 1
-            else:
-                reward = 0
-
-        elif reward_flag == 'squared':
-            ''' Squared cost function '''
-
-            reward = - (blood_glucose_level - bg_ref)**2
-
-        elif reward_flag == 'absolute':
-            ''' Absolute cost function '''
-
-            reward = - abs(blood_glucose_level - bg_ref)
-
         elif reward_flag == 'absolute_with_insulin':
             ''' Absolute cost with insulin constraint '''
 
@@ -172,8 +136,6 @@ class RewardFunction:
         elif reward_flag == 'gaussian_with_insulin':
             ''' Gaussian reward function '''
             h = 30
-            # h = 15
-            # h = 10
             alpha = .5
 
             bg_reward = np.exp(-0.5 * (blood_glucose_level - bg_ref)**2 / h**2)
@@ -206,44 +168,6 @@ class RewardFunction:
             for i in range(len(blood_glucose_level)):
                 reward = reward - (blood_glucose_level[i]/18 - y(t(i)))**2
 
-        elif reward_flag == 'asy_tight':
-            ''' Asymmetric tight reward function '''
-            severe_low_bg = 54
-            low_bg = 90
-            high_bg = 180
-            reward_aux = []
-
-            # if np.min(blood_glucose_level) < severe_low_bg:
-            for i in range(len(blood_glucose_level)):
-                if blood_glucose_level[i] < severe_low_bg:
-                    reward_aux.append(-100)
-                    # reward_aux.append(-10)
-                    # self.tir = 0
-                # elif severe_low_bg <= blood_glucose_level < low_bg:
-                elif severe_low_bg <= blood_glucose_level[i] < low_bg:
-                    reward_aux.append(
-                        np.exp((np.log(117.455)/low_bg) * blood_glucose_level[i]) - 117.455)
-                    # reward_aux.append(np.exp((np.log(19.157) / low_bg) * blood_glucose_level[i]) - 19.157)
-                    # self.tir = 0
-                # elif low_bg <= blood_glucose_level < bg_ref:
-                elif low_bg <= blood_glucose_level[i] < bg_ref:
-                    reward_aux.append(((1 / 18) * blood_glucose_level[i] - 5))
-                    # reward_aux.append(((1/36)*blood_glucose_level[i] - 2) + self.tir)
-                    # self.tir = self.tir + 1
-                # elif bg_ref <= blood_glucose_level <= high_bg:
-                elif bg_ref <= blood_glucose_level[i] <= high_bg:
-                    reward_aux.append(
-                        ((-1 / 72) * blood_glucose_level[i] + (5 / 2)))
-                    # reward_aux.append(((-1/72)*blood_glucose_level[i] + (5/2)) + self.tir)
-                    # self.tir = self.tir + 1
-                # else:
-                elif high_bg < blood_glucose_level[i]:
-                    reward_aux.append(0)
-                    # reward_aux.append(-9)
-                    # self.tir = 0
-
-            reward = reward_aux
-
         elif reward_flag == 'asymmetric':
             ''' Asymmetric reward function '''
             severe_low_bg = 54
@@ -251,34 +175,23 @@ class RewardFunction:
             high_bg = 180
             reward_aux = []
 
-            # if np.min(blood_glucose_level) < severe_low_bg:
             for i in range(len(blood_glucose_level)):
                 if blood_glucose_level[i] < severe_low_bg:
                     reward_aux.append(-100)
-                    # reward_aux.append(-10)
-                    # self.tir = 0
-                # elif severe_low_bg <= blood_glucose_level < low_bg:
+
                 elif severe_low_bg <= blood_glucose_level[i] < low_bg:
                     reward_aux.append(
                         np.exp((np.log(140.9)/low_bg) * blood_glucose_level[i]) - 140.9)
-                    # reward_aux.append(np.exp((np.log(19.157) / low_bg) * blood_glucose_level[i]) - 19.157)
-                    # self.tir = 0
-                # elif low_bg <= blood_glucose_level < bg_ref:
+
                 elif low_bg <= blood_glucose_level[i] < bg_ref:
                     reward_aux.append(((1 / 36) * blood_glucose_level[i] - 2))
-                    # reward_aux.append(((1/36)*blood_glucose_level[i] - 2) + self.tir)
-                    # self.tir = self.tir + 1
-                # elif bg_ref <= blood_glucose_level <= high_bg:
+
                 elif bg_ref <= blood_glucose_level[i] <= high_bg:
                     reward_aux.append(
                         ((-1 / 72) * blood_glucose_level[i] + (5 / 2)))
-                    # reward_aux.append(((-1/72)*blood_glucose_level[i] + (5/2)) + self.tir)
-                    # self.tir = self.tir + 1
-                # else:
+
                 elif high_bg < blood_glucose_level[i]:
                     reward_aux.append(0)
-                    # reward_aux.append(-9)
-                    # self.tir = 0
 
             reward = reward_aux
 
