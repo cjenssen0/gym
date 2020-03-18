@@ -251,39 +251,28 @@ class HovorkaCambridgeBase(gym.Env):
             [self.bg/self.tau_bg, self.insulin_history[-4:], [self.t]])
 
         # Set environment done = True if blood_glucose_level is negative or max iters is overflowed
-        done = 0
+        done = False
 
         if (np.max(self.bg) > self.bg_threshold_high or np.max(self.bg) < self.bg_threshold_low):
-            done = 1
+            done = True
 
         if self.num_iters > self.max_iter:
-            done = 1
-
-        done = bool(done)
+            done = True
 
         # ====================================================================================
         # Calculate Reward  (and give error if action is taken after terminal state)
         # ====================================================================================
 
         if not done:
-            if self.reward_flag != 'gaussian_with_insulin':
-                reward = rewardFunction.calculate_reward(
-                    self.bg, self.reward_flag, 108, tau_bg=self.tau_bg)
-            else:
-                reward = rewardFunction.calculate_reward(
-                    self.bg, 'gaussian_with_insulin', 108, action)
+            reward = rewardFunction.calculate_reward(
+                self.bg, self.reward_flag, 108, tau_bg=self.tau_bg)
 
         elif self.steps_beyond_done is None:
             # Blood glucose below zero -- simulation out of bounds
             self.steps_beyond_done = 0
-            # reward = 0.0
-            # reward = -1000
-            if self.reward_flag != 'gaussian_with_insulin':
-                reward = rewardFunction.calculate_reward(
-                    self.bg, self.reward_flag, 108, tau_bg=self.tau_bg)
-            else:
-                reward = rewardFunction.calculate_reward(
-                    self.bg, 'gaussian_with_insulin', 108, action)
+            reward = rewardFunction.calculate_reward(
+                self.bg, self.reward_flag, 108, tau_bg=self.tau_bg)
+
         else:
             if self.steps_beyond_done == 0:
                 logger.warning("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
