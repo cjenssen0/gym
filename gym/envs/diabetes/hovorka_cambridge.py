@@ -248,7 +248,7 @@ class HovorkaCambridgeBase(gym.Env):
         # Updating state (bg, insulin and time)
         self.t += self.dt
         self.state = np.concatenate(
-            [self.bg/self.tau_bg, list(reversed(self.insulin_history[-4:])), [self.t]])
+            [self.bg/self.tau_bg, self.insulin_history[-4:], [self.t]])
 
         # Set environment done = True if blood_glucose_level is negative or max iters is overflowed
         done = 0
