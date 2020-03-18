@@ -100,7 +100,7 @@ class HovorkaCambridgeBase(gym.Env):
         # Flag for manually resetting the init
         self.reset_basal_manually = None
 
-        self._seed()
+        self.seed()
         self.viewer = None
 
         # ==========================================
@@ -178,7 +178,7 @@ class HovorkaCambridgeBase(gym.Env):
 
         self.steps_beyond_done = None
 
-    def _seed(self, seed=None):
+    def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
