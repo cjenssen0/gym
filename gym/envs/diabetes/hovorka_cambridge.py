@@ -64,6 +64,8 @@ class HovorkaCambridgeBase(gym.Env):
         # np.random.seed(1) ### Fixing seed
 
         self.previous_action = 0
+        self.no_meals = False
+        self.seed_ID = None
 
         # "normalize" range for bg in state-space -> bg in [0, tau_l]
         tau_l = 10.
@@ -155,7 +157,7 @@ class HovorkaCambridgeBase(gym.Env):
 
         eating_time = 1
         meals, meal_indicator = meal_generator(
-            eating_time=eating_time, premeal_bolus_time=0)
+            eating_time=eating_time, premeal_bolus_time=0, no_meals=self.no_meals, seed=self.seed_ID)
 
         # TODO: Clean up these
         self.meals = meals
