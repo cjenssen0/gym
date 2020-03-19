@@ -50,14 +50,13 @@ class RewardFunction:
         elif reward_flag == 'gammaGauss':
 
             # Setting parameters
-            a = 4.0
-            low_bg = 72 / tau_bg
-            high_bg = 200 / tau_bg
-            mode = 108/tau_bg
-            x = blood_glucose_level / tau_bg
+            a = 6.0
+            low_bg = 72
+            high_bg = 200
 
-            alpha = 0.6
-            sigma = 0.5*np.sqrt(abs(mode - low_bg))
+            alpha_low = 0.6
+            alpha_high = 4
+            sigma = np.sqrt(abs(bg_ref - low_bg))
 
             def gammaRev(x, a, mode, loc):
                 # dist = stats.skewnorm(a, loc, scale)
@@ -80,11 +79,11 @@ class RewardFunction:
                 x_high = x[x >= high_bg]
 
                 if len(x_low) > 0:
-                    R += sum(Gauss(x_low, low_bg, alpha*sigma))
+                    R += sum(Gauss(x_low, low_bg, alpha_low*sigma))
                 else:
                     R += 0.0
-                if len(x_low) > 0:
-                    R += sum(Gauss(x_high, high_bg, sigma))
+                if len(x_high) > 0:
+                    R += sum(Gauss(x_high, high_bg, alpha_high*sigma))
                 else:
                     R += 0.0
                 R += sum(gammaRev(x_I, a, mode, low_bg))
@@ -94,9 +93,10 @@ class RewardFunction:
                 #     x[x >= high_bg], high_bg, sigma)
                 # self.reward[(low_bg < x)*(x < high_bg)
                 #             ] = gammaRev(x_I, a, mode, low_bg)
-                return R
-            R = rewGauss(self, x, a, mode, low_bg, high_bg, sigma)
-            return R
+                return R / len(blood_glucose_level)
+            reward = rewGauss(self, blood_glucose_level, a,
+                              bg_ref, low_bg, high_bg, sigma)
+            return reward
 
         elif reward_flag == 'gaussian':
             ''' Gaussian reward function '''

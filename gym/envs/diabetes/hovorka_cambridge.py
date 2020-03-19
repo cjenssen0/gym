@@ -69,7 +69,7 @@ class HovorkaCambridgeBase(gym.Env):
         self.seed_ID = None
 
         # "normalize" range for bg in state-space -> bg in [0, tau_l]
-        tau_l = 10.
+        tau_l = 250.
         self.tau_bg = 250./tau_l
 
         # Bolus carb factor -- [g/U]
@@ -142,7 +142,7 @@ class HovorkaCambridgeBase(gym.Env):
         initial_insulin = np.ones(4) * self.init_basal_optimal
         initial_bg = X0[-1] * 18 / self.tau_bg
         self.state = np.concatenate(
-            [np.repeat(initial_bg, self.stepsize), initial_insulin, [self.t]])
+            [np.repeat(initial_bg, self.stepsize), initial_insulin/self.tau_bg, [self.t]])
 
         self.simulation_state = X0
 
