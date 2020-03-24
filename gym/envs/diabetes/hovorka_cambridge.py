@@ -91,7 +91,7 @@ class HovorkaCambridgeBase(gym.Env):
 
         # This is the space of allowable actions -- from 0 insulin (stop the pump) to twice the basal rate
         self.action_space = spaces.Box(
-            0, 4*self.init_basal_optimal, (1,), dtype=np.float32)
+            0, 2*self.init_basal_optimal, (1,), dtype=np.float32)
 
         # Initialize episode randomly or at a fixed BG level
         if bg_init_flag == 'random':
@@ -253,7 +253,7 @@ class HovorkaCambridgeBase(gym.Env):
         # Set environment done = True if blood_glucose_level is negative or max iters is overflowed
         done = False
 
-        if (np.max(self.bg) > self.bg_threshold_high or np.max(self.bg) < self.bg_threshold_low):
+        if (np.max(self.bg) > self.bg_threshold_high or np.min(self.bg) < self.bg_threshold_low):
             done = True
 
         if self.num_iters > self.max_iter:
