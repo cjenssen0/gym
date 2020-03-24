@@ -64,9 +64,12 @@ class HovorkaCambridgeBase(gym.Env):
         # np.random.seed(1) ### Fixing seed
 
         self.previous_action = 0
+        self.bg = np.empty(30, dtype=np.float32)
+        self.no_meals = False
+        self.seed_ID = None
 
         # "normalize" range for bg in state-space -> bg in [0, tau_l]
-        tau_l = 10.
+        tau_l = 250.
         self.tau_bg = 250./tau_l
 
         # Bolus carb factor -- [g/U]
@@ -88,7 +91,7 @@ class HovorkaCambridgeBase(gym.Env):
 
         # This is the space of allowable actions -- from 0 insulin (stop the pump) to twice the basal rate
         self.action_space = spaces.Box(
-            0, 4*self.init_basal_optimal, (1,), dtype=np.float32)
+            0, 2*self.init_basal_optimal, (1,), dtype=np.float32)
 
         # Initialize episode randomly or at a fixed BG level
         if bg_init_flag == 'random':
@@ -100,7 +103,7 @@ class HovorkaCambridgeBase(gym.Env):
         # Flag for manually resetting the init
         self.reset_basal_manually = None
 
-        self._seed()
+        self.seed()
         self.viewer = None
 
         # ==========================================
@@ -139,7 +142,7 @@ class HovorkaCambridgeBase(gym.Env):
         initial_insulin = np.ones(4) * self.init_basal_optimal
         initial_bg = X0[-1] * 18 / self.tau_bg
         self.state = np.concatenate(
-            [np.repeat(initial_bg, self.stepsize), initial_insulin, [self.t]])
+            [np.repeat(initial_bg, self.stepsize), initial_insulin/self.tau_bg, [self.t]])
 
         self.simulation_state = X0
 
@@ -155,7 +158,7 @@ class HovorkaCambridgeBase(gym.Env):
 
         eating_time = 1
         meals, meal_indicator = meal_generator(
-            eating_time=eating_time, premeal_bolus_time=0)
+            eating_time=eating_time, premeal_bolus_time=0, no_meals=self.no_meals, seed=self.seed_ID)
 
         # TODO: Clean up these
         self.meals = meals
@@ -178,7 +181,7 @@ class HovorkaCambridgeBase(gym.Env):
 
         self.steps_beyond_done = None
 
-    def _seed(self, seed=None):
+    def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
@@ -210,8 +213,6 @@ class HovorkaCambridgeBase(gym.Env):
         self.integrator.set_initial_value(
             self.simulation_state, self.num_iters)
 
-        bg = []
-
         # ==========================
         # Integration loop
         # ==========================
@@ -233,57 +234,45 @@ class HovorkaCambridgeBase(gym.Env):
             # solving the equations for 1 minute at a time
             self.integrator.integrate(self.integrator.t + 1)
 
-            bg.append(self.integrator.y[-1] * 18)
-
+            self.bg[i] = self.integrator.y[-1] * 18
             self.num_iters += 1
 
         # Updating environment parameters
         self.simulation_state = self.integrator.y
 
         # Recording bg history for plotting
-        self.bg_history = np.concatenate([self.bg_history, bg])
+        self.bg_history = np.concatenate([self.bg_history, self.bg])
         self.insulin_history = np.concatenate(
             [self.insulin_history, insulin_rate])
 
         # Updating state (bg, insulin and time)
         self.t += self.dt
         self.state = np.concatenate(
-            [np.array(bg)/self.tau_bg, list(reversed(self.insulin_history[-4:])), [self.t]])
+            [self.bg/self.tau_bg, self.insulin_history[-4:], [self.t]])
 
         # Set environment done = True if blood_glucose_level is negative or max iters is overflowed
-        done = 0
+        done = False
 
-        if (np.max(bg) > self.bg_threshold_high or np.max(bg) < self.bg_threshold_low):
-            done = 1
+        if (np.max(self.bg) > self.bg_threshold_high or np.min(self.bg) < self.bg_threshold_low):
+            done = True
 
         if self.num_iters > self.max_iter:
-            done = 1
-
-        done = bool(done)
+            done = True
 
         # ====================================================================================
         # Calculate Reward  (and give error if action is taken after terminal state)
         # ====================================================================================
 
         if not done:
-            if self.reward_flag != 'gaussian_with_insulin':
-                reward = rewardFunction.calculate_reward(
-                    np.array(bg), self.reward_flag, 108, tau_bg=self.tau_bg)
-            else:
-                reward = rewardFunction.calculate_reward(
-                    np.array(bg), 'gaussian_with_insulin', 108, action)
+            reward = rewardFunction.calculate_reward(
+                self.bg, self.reward_flag, 108, tau_bg=self.tau_bg)
 
         elif self.steps_beyond_done is None:
             # Blood glucose below zero -- simulation out of bounds
             self.steps_beyond_done = 0
-            # reward = 0.0
-            # reward = -1000
-            if self.reward_flag != 'gaussian_with_insulin':
-                reward = rewardFunction.calculate_reward(
-                    np.array(bg), self.reward_flag, 108, tau_bg=self.tau_bg)
-            else:
-                reward = rewardFunction.calculate_reward(
-                    np.array(bg), 'gaussian_with_insulin', 108, action)
+            reward = rewardFunction.calculate_reward(
+                self.bg, self.reward_flag, 108, tau_bg=self.tau_bg)
+
         else:
             if self.steps_beyond_done == 0:
                 logger.warning("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.")
