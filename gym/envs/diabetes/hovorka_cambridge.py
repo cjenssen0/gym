@@ -189,7 +189,7 @@ class HovorkaCambridgeBase(gym.Env):
         ''' Update parameters of model,
         this is only used for inherited classes'''
 
-        reward_flag = 'asymmetric'
+        reward_flag = 'gammaGauss'
 
         bg_init_flag = 'random'
 
@@ -200,8 +200,15 @@ class HovorkaCambridgeBase(gym.Env):
         Take action. In the diabetes simulation this means increase, decrease or do nothing
         to the insulin to carb ratio (bolus).
         """
+        # Transform normalized action to proper scale
 
-        # Manually checking and forcing the action to be within bounds insted of using assert.
+        def getA(self, action):
+            action_mid = self.action_space.high/2
+            a = action_mid*action + action_mid
+            return a
+        action = getA(self, action)
+
+        # Manually checking and forcing the action to be within bounds instead of using assert.
         # We should be careful with this
         if action > self.action_space.high:
             action = self.action_space.high
