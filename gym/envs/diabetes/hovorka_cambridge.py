@@ -295,6 +295,15 @@ class HovorkaCambridgeBase(gym.Env):
         This is basically a copy of the init function
         '''
 
+        # Reset meals and meal_indicator, sampling new meals and the time of the meals
+        eating_time = 1
+        meals, meal_indicator = meal_generator(
+            eating_time=eating_time, premeal_bolus_time=0, no_meals=self.no_meals)
+
+        self.meals = meals
+        self.meal_indicator = meal_indicator
+        self.eating_time = eating_time
+
         # Reset time counter
         self.t = 0.
 
