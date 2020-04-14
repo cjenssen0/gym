@@ -98,6 +98,52 @@ class RewardFunction:
                               bg_ref, low_bg, high_bg, sigma)
             return reward
 
+        elif reward_flag == 'gammaGaussBin':
+
+            # Setting parameters
+            a = 2.3
+            low_bg = 58
+            high_bg = 180
+
+            alpha_low = 0.6
+            alpha_high = 4
+            sigma = np.sqrt(abs(bg_ref - low_bg))
+
+            def gammaRev(x, a, mode, loc):
+                # dist = stats.skewnorm(a, loc, scale)
+                theta = (mode-loc)/(a-1)
+                dist = stats.gamma(a, loc=loc, scale=theta)
+                distMax = dist.pdf(mode)
+                R = (dist.pdf(x) / distMax)
+                return R
+
+            def Gauss(x, mode, scale):
+                dist = stats.norm(mode, scale)
+                distMax = dist.pdf(mode)
+                R = dist.pdf(x)/distMax - 1
+                return R
+
+            def rewGauss(self, x, a, mode, low_bg, high_bg, sigma):
+                R = 0.
+                x_I = x[(low_bg <= x)*(x <= high_bg)]
+                x_low = x[x < low_bg]
+                x_high = x[x > high_bg]
+
+                if len(x_low) > 0:
+                    R += sum(Gauss(x_low, low_bg, alpha_low*sigma))
+                else:
+                    R += 0.0
+                if len(x_high) > 0:
+                    R += sum(Gauss(x_high, high_bg, alpha_high*sigma))
+                else:
+                    R += 0.0
+                R += sum(gammaRev(x_I, a, mode, low_bg))
+
+                return R / len(x)
+            reward = rewGauss(self, blood_glucose_level, a,
+                              bg_ref, low_bg, high_bg, sigma)
+            return reward
+
         elif reward_flag == 'gaussian':
             ''' Gaussian reward function '''
             h = 30
