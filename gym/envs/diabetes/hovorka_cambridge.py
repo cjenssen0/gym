@@ -74,6 +74,7 @@ class HovorkaCambridgeBase(gym.Env):
         self.previous_action = 0
         self.bg = np.empty(30, dtype=np.float32)
         self.no_meals = False
+        self.randDropMeals = False
         self.seed_ID = None
 
         # Bolus carb factor -- [g/U]
@@ -132,10 +133,13 @@ class HovorkaCambridgeBase(gym.Env):
         self.simulation_time = 30
         self.n_solver_steps = 1
         self.stepsize = int(self.simulation_time/self.n_solver_steps)
+        # TODO: This number is arbitrary -- the max length of the episode
+        # self.max_iter = 1440
+        self.max_iter = 2160
 
         # Set time variable for use in the state
         self.t = 0.
-        self.dt = self.simulation_time / 60
+        self.dt = 1
 
         # Observation space -- the state space for the RL algorithm -> 30 mins of glucose values and 4 insulin values (last 2 hours)
         self.observation_space = spaces.Box(
@@ -147,9 +151,12 @@ class HovorkaCambridgeBase(gym.Env):
         initial_insulin = np.ones(4) * self.init_basal_optimal
         initial_insulin_norm = self.normalize(initial_insulin, self.max_action)
         initial_bg = X0[-1] * 18
+
+        # Normalize the parts of the state and concat
         initial_bg_norm = self.normalize(initial_bg, 500.)
+        t_norm = self.normalize(self.t, self.max_iter/self.simulation_time)
         self.state = np.concatenate(
-            [np.repeat(initial_bg_norm, self.stepsize), initial_insulin, [self.t]])
+            [np.repeat(initial_bg_norm, self.stepsize), initial_insulin_norm, [t_norm]])
 
         self.simulation_state = X0
 
@@ -178,10 +185,6 @@ class HovorkaCambridgeBase(gym.Env):
         # If blood glucose is less than zero, the simulator is out of bounds.
         self.bg_threshold_low = 0
         self.bg_threshold_high = 500
-
-        # TODO: This number is arbitrary -- the max length of the episode
-        # self.max_iter = 1440
-        self.max_iter = 2160
 
         # Reward flag
         self.reward_flag = reward_flag
@@ -255,12 +258,14 @@ class HovorkaCambridgeBase(gym.Env):
 
         # Updating state (bg, insulin and time)
         self.t += self.dt
+
+        # Normalize the parts of the state and concat them
+        t_norm = self.normalize(self.t, self.max_iter/self.simulation_time)
         bg_norm = self.normalize(self.bg, 500.)
         insulin_norm = self.normalize(
             self.insulin_history[-4:], self.max_action)
         self.state = np.concatenate(
-            [bg_norm, insulin_norm, [self.t]])
-
+            [bg_norm, insulin_norm, [t_norm]])
         # Set environment done = True if blood_glucose_level is negative or max iters is overflowed
         done = False
 
@@ -299,6 +304,13 @@ class HovorkaCambridgeBase(gym.Env):
         This is basically a copy of the init function
         '''
 
+        # Randomly drop meals
+        if self.randDropMeals:
+            if np.random.randint(2):
+                self.no_meals = True
+            else:
+                self.no_meals = False
+
         # Reset meals and meal_indicator, sampling new meals and the time of the meals
         eating_time = 1
         meals, meal_indicator = meal_generator(
@@ -328,11 +340,12 @@ class HovorkaCambridgeBase(gym.Env):
         # State is BG, simulation_state is parameters of hovorka model
         initial_bg = X0[-1] * 18
         initial_bg_norm = self.normalize(initial_bg, 500.)
+        t_norm = self.normalize(self.t, self.max_iter/self.simulation_time)
         initial_insulin = np.ones(4) * self.init_basal_optimal
         initial_insulin_norm = self.normalize(
             initial_insulin, self.max_action)
         self.state = np.concatenate(
-            [np.repeat(initial_bg_norm, self.stepsize), initial_insulin_norm, [self.t]])
+            [np.repeat(initial_bg_norm, self.stepsize), initial_insulin_norm, [t_norm]])
 
         self.simulation_state = X0
         self.bg_history = []
