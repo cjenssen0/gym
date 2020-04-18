@@ -57,6 +57,14 @@ class HovorkaCambridgeBase(gym.Env):
         'video.frames_per_second': 50
     }
 
+    def normalize(self, x, xmax, isNorm=False):
+        xm = xmax/2
+        if not isNorm:
+            y = (x-xm)/xm
+        else:
+            y = xm*x + xm
+        return y
+
     def __init__(self):
         """
         Initializing the simulation environment.
@@ -67,10 +75,6 @@ class HovorkaCambridgeBase(gym.Env):
         self.bg = np.empty(30, dtype=np.float32)
         self.no_meals = False
         self.seed_ID = None
-
-        # "normalize" range for bg in state-space -> bg in [0, tau_l]
-        tau_l = 250.
-        self.tau_bg = 250./tau_l
 
         # Bolus carb factor -- [g/U]
         self.bolus = 30
@@ -140,9 +144,10 @@ class HovorkaCambridgeBase(gym.Env):
 
         # The initial value of insulin is just 4 copies of the basal rate
         initial_insulin = np.ones(4) * self.init_basal_optimal
-        initial_bg = X0[-1] * 18 / self.tau_bg
+        initial_bg = X0[-1] * 18
+        initial_bg_norm = self.normalize(initial_bg, 500.)
         self.state = np.concatenate(
-            [np.repeat(initial_bg, self.stepsize), initial_insulin/self.tau_bg, [self.t]])
+            [np.repeat(initial_bg_norm, self.stepsize), initial_insulin, [self. |]])
 
         self.simulation_state = X0
 
@@ -254,8 +259,9 @@ class HovorkaCambridgeBase(gym.Env):
 
         # Updating state (bg, insulin and time)
         self.t += self.dt
+        bg_norm = self.normalize(self.bg, 500.)
         self.state = np.concatenate(
-            [self.bg/self.tau_bg, self.insulin_history[-4:], [self.t]])
+            [bg_norm, self.insulin_history[-4:], [self.t]])
 
         # Set environment done = True if blood_glucose_level is negative or max iters is overflowed
         done = False
@@ -323,9 +329,10 @@ class HovorkaCambridgeBase(gym.Env):
 
         # State is BG, simulation_state is parameters of hovorka model
         initial_bg = X0[-1] * 18
+        initial_bg_norm = self.normalize(initial_bg, 500.)
         initial_insulin = np.ones(4) * self.init_basal_optimal
         self.state = np.concatenate(
-            [np.repeat(initial_bg, self.stepsize)/self.tau_bg, initial_insulin, [self.t]])
+            [np.repeat(initial_bg_norm, self.stepsize), initial_insulin, [self.t]])
 
         self.simulation_state = X0
         self.bg_history = []
