@@ -95,7 +95,8 @@ class HovorkaCambridgeBase(gym.Env):
 
         # This is the space of allowable actions -- from 0 insulin (stop the pump) to twice the basal rate
         self.action_space = spaces.Box(
-            0, 2*self.init_basal_optimal, (1,), dtype=np.float32)
+            0, 1, (1,), dtype=np.float32)
+        self.max_action = 2*self.init_basal_optimal*self.action_space.high
 
         # Initialize episode randomly or at a fixed BG level
         if bg_init_flag == 'random':
@@ -144,6 +145,7 @@ class HovorkaCambridgeBase(gym.Env):
 
         # The initial value of insulin is just 4 copies of the basal rate
         initial_insulin = np.ones(4) * self.init_basal_optimal
+        initial_insulin_norm = self.normalize(initial_insulin, self.max_action)
         initial_bg = X0[-1] * 18
         initial_bg_norm = self.normalize(initial_bg, 500.)
         self.state = np.concatenate(
@@ -205,13 +207,6 @@ class HovorkaCambridgeBase(gym.Env):
         Take action. In the diabetes simulation this means increase, decrease or do nothing
         to the insulin to carb ratio (bolus).
         """
-        # Transform normalized action to proper scale
-
-        def getA(self, action):
-            action_mid = self.action_space.high/2
-            a = action_mid*action + action_mid
-            return a
-        action = getA(self, action)
 
         # Manually checking and forcing the action to be within bounds instead of using assert.
         # We should be careful with this
@@ -220,7 +215,8 @@ class HovorkaCambridgeBase(gym.Env):
         elif action < self.action_space.low:
             action = self.action_space.low
 
-        # assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
+        # Transform normalized action to proper scale
+        action = self.normalize(action, self.max_action, isNorm=True)
 
         self.integrator.set_initial_value(
             self.simulation_state, self.num_iters)
@@ -260,8 +256,10 @@ class HovorkaCambridgeBase(gym.Env):
         # Updating state (bg, insulin and time)
         self.t += self.dt
         bg_norm = self.normalize(self.bg, 500.)
+        insulin_norm = self.normalize(
+            self.insulin_history[-4:], self.max_action)
         self.state = np.concatenate(
-            [bg_norm, self.insulin_history[-4:], [self.t]])
+            [bg_norm, insulin_norm, [self.t]])
 
         # Set environment done = True if blood_glucose_level is negative or max iters is overflowed
         done = False
@@ -284,7 +282,7 @@ class HovorkaCambridgeBase(gym.Env):
             # Blood glucose below zero -- simulation out of bounds
             self.steps_beyond_done = 0
             reward = rewardFunction.calculate_reward(
-                self.bg, self.reward_flag, 108, tau_bg=self.tau_bg)
+                self.bg, self.reward_flag, 108)
 
         else:
             if self.steps_beyond_done == 0:
@@ -331,8 +329,10 @@ class HovorkaCambridgeBase(gym.Env):
         initial_bg = X0[-1] * 18
         initial_bg_norm = self.normalize(initial_bg, 500.)
         initial_insulin = np.ones(4) * self.init_basal_optimal
+        initial_insulin_norm = self.normalize(
+            initial_insulin, self.max_action)
         self.state = np.concatenate(
-            [np.repeat(initial_bg_norm, self.stepsize), initial_insulin, [self.t]])
+            [np.repeat(initial_bg_norm, self.stepsize), initial_insulin_norm, [self.t]])
 
         self.simulation_state = X0
         self.bg_history = []
