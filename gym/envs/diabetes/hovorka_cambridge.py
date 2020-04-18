@@ -74,6 +74,7 @@ class HovorkaCambridgeBase(gym.Env):
         self.previous_action = 0
         self.bg = np.empty(30, dtype=np.float32)
         self.no_meals = False
+        self.randDropMeals = True
         self.seed_ID = None
 
         # Bolus carb factor -- [g/U]
@@ -304,6 +305,13 @@ class HovorkaCambridgeBase(gym.Env):
         '''
         This is basically a copy of the init function
         '''
+
+        # Randomly drop meals
+        if self.randDropMeals:
+            if np.random.randint(2):
+                self.no_meals = True
+            else:
+                self.no_meals = False
 
         # Reset meals and meal_indicator, sampling new meals and the time of the meals
         eating_time = 1
