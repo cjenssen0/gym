@@ -147,7 +147,7 @@ class HovorkaCambridgeBase(gym.Env):
         initial_bg = X0[-1] * 18
         initial_bg_norm = self.normalize(initial_bg, 500.)
         self.state = np.concatenate(
-            [np.repeat(initial_bg_norm, self.stepsize), initial_insulin, [self. |]])
+            [np.repeat(initial_bg_norm, self.stepsize), initial_insulin, [self.t]])
 
         self.simulation_state = X0
 
@@ -278,7 +278,7 @@ class HovorkaCambridgeBase(gym.Env):
 
         if not done:
             reward = rewardFunction.calculate_reward(
-                self.bg, self.reward_flag, 108, tau_bg=self.tau_bg)
+                self.bg, self.reward_flag, 108)
 
         elif self.steps_beyond_done is None:
             # Blood glucose below zero -- simulation out of bounds
