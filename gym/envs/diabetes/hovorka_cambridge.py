@@ -96,7 +96,7 @@ class HovorkaCambridgeBase(gym.Env):
 
         # This is the space of allowable actions -- from 0 insulin (stop the pump) to twice the basal rate
         self.action_space = spaces.Box(
-            0, 1, (1,), dtype=np.float32)
+            -1, 1, (1,), dtype=np.float32)
         self.max_action = 2*self.init_basal_optimal*self.action_space.high
 
         # Initialize episode randomly or at a fixed BG level
@@ -220,7 +220,6 @@ class HovorkaCambridgeBase(gym.Env):
 
         # Transform normalized action to proper scale
         action = self.normalize(action, self.max_action, isNorm=True)
-
         self.integrator.set_initial_value(
             self.simulation_state, self.num_iters)
 
