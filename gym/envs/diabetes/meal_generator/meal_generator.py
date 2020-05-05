@@ -32,6 +32,7 @@ def meal_generator(eating_time=1, premeal_bolus_time=0, meal_uncertainty_grams=2
     # with a probability p drop bolus
     guessed_meal_amount = np.random.choice(
         2, 4, p=[p, 1-p])*guessed_meal_amount
+    #guessed_meal_amount = np.array([1, 1, 1, 1])*guessed_meal_amount
 
     meals = np.zeros(2160)
 
