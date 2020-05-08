@@ -101,7 +101,7 @@ class RewardFunction:
         elif reward_flag == 'gammaGaussBin':
 
             # Setting parameters
-            a = 3.5
+            a = 2.3
             low_bg = 58
             high_bg = 180
 
