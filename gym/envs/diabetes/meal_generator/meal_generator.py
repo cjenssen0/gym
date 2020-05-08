@@ -20,6 +20,10 @@ def meal_generator(eating_time=1, premeal_bolus_time=0, meal_uncertainty_grams=2
 
     # Using the base-meals of Anas El Fathis work and adding +-30 mins to the times randomly
     meal_amounts = np.array([40, 80, 60, 30]) + np.random.uniform(-20, 20, 4)
+
+    # randomly drop meals with probability p
+    meal_amounts = np.random.choice(2, 4, p=[p, 1-p])*meal_amounts
+
     meal_times = np.array([8*60, 12*60, 18*60, 22*60]) + \
         np.random.choice(np.linspace(-30, 30, 3, dtype=int), 4)
 
